@@ -7,4 +7,5 @@ var (
 	ErrInvalidTransition = errors.New("invalid status transition")
 	ErrInvalidJob        = errors.New("invalid job")
 	ErrJobAlreadyDone    = errors.New("job already in terminal state")
+	ErrJobAlreadyExists  = errors.New("job already exists")
 )
