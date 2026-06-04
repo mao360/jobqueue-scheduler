@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"connectrpc.com/connect"
+	"connectrpc.com/validate"
 	"github.com/mao360/jobqueue-proto/gen/go/jobqueue/v1/jobqueuev1connect"
 	"github.com/mao360/jobqueue-scheduler/internal/repository/memory"
 	"github.com/mao360/jobqueue-scheduler/internal/transport/connectrpc"
@@ -22,7 +24,10 @@ func New() *App {
 	h := connectrpc.NewGRPCHandler(uc)
 
 	mux := http.NewServeMux()
-	mux.Handle(jobqueuev1connect.NewSchedulerServiceHandler(h))
+	mux.Handle(jobqueuev1connect.NewSchedulerServiceHandler(
+		h,
+		connect.WithInterceptors(validate.NewInterceptor()),
+	))
 
 	proto := new(http.Protocols)
 	proto.SetHTTP1(true)
