@@ -60,6 +60,78 @@ func domainJobStatusToProto(jobStatus domain.JobStatus) v1.JobStatus {
 	}
 }
 
+func domainEventToProto(ev domain.JobEvent) *v1.JobEvent {
+	pe := &v1.JobEvent{
+		JobId: string(ev.JobID),
+		At:    tsOrNil(ev.OccurredAt),
+	}
+
+	switch p := ev.Payload.(type) {
+	case domain.StatusChanged:
+		pe.Event = &v1.JobEvent_StatusChanged{StatusChanged: &v1.JobStatusChanged{
+			OldStatus: domainJobStatusToProto(p.From),
+			NewStatus: domainJobStatusToProto(p.To),
+		}}
+	case domain.Progress:
+		pe.Event = &v1.JobEvent_Progress{Progress: &v1.JobProgress{
+			Percent: int32(p.Percent),
+			Message: p.Message,
+		}}
+	case domain.Log:
+		pe.Event = &v1.JobEvent_Log{Log: &v1.JobLog{Line: p.Line}}
+	}
+
+	return pe
+}
+
+func protoJobStatusToDomain(s v1.JobStatus) domain.JobStatus {
+	switch s {
+	case v1.JobStatus_JOB_STATUS_PENDING:
+		return domain.StatusPending
+	case v1.JobStatus_JOB_STATUS_RUNNING:
+		return domain.StatusRunning
+	case v1.JobStatus_JOB_STATUS_SUCCEEDED:
+		return domain.StatusSucceeded
+	case v1.JobStatus_JOB_STATUS_FAILED:
+		return domain.StatusFailed
+	case v1.JobStatus_JOB_STATUS_CANCELLED:
+		return domain.StatusCancelled
+	default:
+		return domain.StatusUnspecified
+	}
+}
+
+func protoEventToDomain(e *v1.JobEvent) domain.JobEvent {
+	ev := domain.JobEvent{
+		JobID:      domain.JobID(e.JobId),
+		OccurredAt: tsToTime(e.At),
+	}
+
+	switch m := e.Event.(type) {
+	case *v1.JobEvent_StatusChanged:
+		ev.Payload = domain.StatusChanged{
+			From: protoJobStatusToDomain(m.StatusChanged.OldStatus),
+			To:   protoJobStatusToDomain(m.StatusChanged.NewStatus),
+		}
+	case *v1.JobEvent_Progress:
+		ev.Payload = domain.Progress{
+			Percent: int(m.Progress.Percent),
+			Message: m.Progress.Message,
+		}
+	case *v1.JobEvent_Log:
+		ev.Payload = domain.Log{Line: m.Log.Line}
+	}
+
+	return ev
+}
+
+func tsToTime(ts *timestamppb.Timestamp) time.Time {
+	if ts == nil {
+		return time.Now()
+	}
+	return ts.AsTime()
+}
+
 func tsOrNil(ts time.Time) *timestamppb.Timestamp {
 	if ts.IsZero() {
 		return nil

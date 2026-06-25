@@ -9,6 +9,8 @@ import (
 	"connectrpc.com/connect"
 	"connectrpc.com/validate"
 	"github.com/mao360/jobqueue-proto/gen/go/jobqueue/v1/jobqueuev1connect"
+	"github.com/mao360/jobqueue-scheduler/internal/eventbus"
+	"github.com/mao360/jobqueue-scheduler/internal/gateway"
 	"github.com/mao360/jobqueue-scheduler/internal/repository/memory"
 	"github.com/mao360/jobqueue-scheduler/internal/transport/connectrpc"
 	"github.com/mao360/jobqueue-scheduler/internal/usecase"
@@ -19,15 +21,19 @@ type App struct {
 }
 
 func New() *App {
-	m := memory.New()
-	uc := usecase.New(m)
+	repo := memory.New()
+	bus := eventbus.New()
+	gw := gateway.New()
+
+	uc := usecase.New(repo, bus, gw, bus)
 	h := connectrpc.NewGRPCHandler(uc)
+	wh := connectrpc.NewWorkerHandler(gw, uc)
+
+	interceptors := connect.WithInterceptors(validate.NewInterceptor())
 
 	mux := http.NewServeMux()
-	mux.Handle(jobqueuev1connect.NewSchedulerServiceHandler(
-		h,
-		connect.WithInterceptors(validate.NewInterceptor()),
-	))
+	mux.Handle(jobqueuev1connect.NewSchedulerServiceHandler(h, interceptors))
+	mux.Handle(jobqueuev1connect.NewWorkerGatewayServiceHandler(wh, interceptors))
 
 	proto := new(http.Protocols)
 	proto.SetHTTP1(true)

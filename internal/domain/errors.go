@@ -8,4 +8,5 @@ var (
 	ErrInvalidJob        = errors.New("invalid job")
 	ErrJobAlreadyDone    = errors.New("job already in terminal state")
 	ErrJobAlreadyExists  = errors.New("job already exists")
+	ErrNoWorker          = errors.New("no worker")
 )
