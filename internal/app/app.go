@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 	"connectrpc.com/validate"
 	"github.com/mao360/jobqueue-proto/gen/go/jobqueue/v1/jobqueuev1connect"
+	"github.com/mao360/jobqueue-scheduler/internal/config"
 	"github.com/mao360/jobqueue-scheduler/internal/eventbus"
 	"github.com/mao360/jobqueue-scheduler/internal/gateway"
 	"github.com/mao360/jobqueue-scheduler/internal/repository/memory"
@@ -17,10 +18,16 @@ import (
 )
 
 type App struct {
-	srv *http.Server
+	srv             *http.Server
+	shutdownTimeout time.Duration
 }
 
-func New() *App {
+func New() (*App, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, err
+	}
+
 	repo := memory.New()
 	bus := eventbus.New()
 	gw := gateway.New()
@@ -40,15 +47,15 @@ func New() *App {
 	proto.SetUnencryptedHTTP2(true)
 
 	srv := &http.Server{
-		Addr:      ":8080",
+		Addr:      cfg.ListenAddr,
 		Handler:   mux,
 		Protocols: proto,
 	}
 
 	return &App{
-		srv: srv,
-	}
-
+		srv:             srv,
+		shutdownTimeout: cfg.ShutdownTimeout,
+	}, nil
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -63,7 +70,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		shCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		shCtx, cancel := context.WithTimeout(context.Background(), a.shutdownTimeout)
 		defer cancel()
 		return a.srv.Shutdown(shCtx)
 	case err := <-errCh:
