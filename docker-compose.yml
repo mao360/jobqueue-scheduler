@@ -1,0 +1,12 @@
+services:
+  scheduler:
+    build: .
+    ports:
+      - "${SCHEDULER_PORT:-8080}:8080"
+
+  worker:
+    image: ghcr.io/mao360/jobqueue-worker:v0.1.0
+    depends_on:
+      - scheduler
+    environment:
+      SCHEDULER_URL: http://scheduler:8080
